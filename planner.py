@@ -3,7 +3,10 @@ from rclpy.node import Node
 import numpy as np
 from autoware_auto_msgs.msg import BoundingBoxArray
 from autoware_auto_msgs.msg import RawControlCommand
+from sensor_msgs.msg import CompressedImage
 from nav_msgs.msg import Odometry
+import matplotlib.pyplot as plt
+import cv2
 import task1
 import task2
 import task3
@@ -54,7 +57,8 @@ class Driver(Node):
     position = None
     pre_position = None
     velocity = None
-    currentTask = 0  # You can change the task to test
+    currentTask = 3  # You can change the task to test
+    avg = 50
     if currentTask:
         currentCheckPoint = taskToCheckPoints[currentTask]
 
@@ -66,6 +70,8 @@ class Driver(Node):
                 self.bounding_boxes_callback, 10)
         self.create_subscription(Odometry, '/lgsvl_odom',
                 self.odom_callback, 10)
+        self.create_subscription(CompressedImage, '/simulator/camera_node/image/compressed',
+                self.camera_callback, 10)
 
         self.tmr = self.create_timer(0.05, self.controller_callback)
 
@@ -74,10 +80,8 @@ class Driver(Node):
         msg.throttle = 30
         msg.front_steer = 0
         if self.position and self.pre_position:
-            # Speed limit to 30 m/s
-            if ((self.velocity.x**2)+(self.velocity.y**2)+(self.velocity.z**2))**0.5 > 30.0/3.6:
-                msg.throttle = 0
-
+            checkPoint = checkPoints[self.currentCheckPoint]
+            print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
             if self.currentTask == 0: # Direct by waypoints
                 dest_vec = np.array([checkPoints[self.currentCheckPoint].x-self.position.x,
                                      checkPoints[self.currentCheckPoint].y-self.position.y])
@@ -103,13 +107,18 @@ class Driver(Node):
             elif self.currentTask == 2: # Road Curve
                 msg.throttle, msg.brake, msg.front_steer = task2.start()
             elif self.currentTask == 3: # Narrowing Driving Lanes
-                msg.throttle, msg.brake, msg.front_steer = task3.start()
+                msg.throttle, msg.brake, msg.front_steer = task3.start(self.avg, checkPoints[taskToCheckPoints[3]], self.position)
             elif self.currentTask == 4: # T-junction
                 msg.throttle, msg.brake, msg.front_steer = task4.start()
             elif self.currentTask == 5: # Roundabout
                 msg.throttle, msg.brake, msg.front_steer = task5.start()
             elif self.currentTask == 6: # Angled Parking Slots
                 msg.throttle, msg.brake, msg.front_steer = task6.start()
+
+            # Speed limit to 30 m/s
+            if ((self.velocity.x**2)+(self.velocity.y**2)+(self.velocity.z**2))**0.5 > 30.0/3.6:
+                msg.throttle = 0
+
 
         self.pub.publish(msg)
 
@@ -139,8 +148,75 @@ class Driver(Node):
         if self.currentCheckPoint < len(checkPoints) and checkPoints[self.currentCheckPoint].getDis() < DIS_THROSHOLD:
             #print('x = %d, y = %d, task = %d' %(checkPoints[self.currentCheckPoint].x, checkPoints[self.currentCheckPoint].y, checkPoints[self.currentCheckPoint].task))
             print('Waypoint %d passed, Task %d.' % (self.currentCheckPoint, checkPoints[self.currentCheckPoint].task))
-            self.currentCheckPoint += 1
             self.currentTask = checkPoints[self.currentCheckPoint].task
+            self.currentCheckPoint += 1
+
+    def camera_callback(self, data):
+        RGB_image = cv2.cvtColor(cv2.imdecode(np.array(data.data, dtype=np.uint8), cv2.IMREAD_COLOR) , cv2.COLOR_BGR2RGB)
+        view = bird(RGB_image)
+        rightx, righty = find_road(view)
+
+        if (max(rightx)-min(rightx)) >= 50:
+            s = 0
+            cnt = 0
+            fit = np.polyfit(rightx, righty, 2)
+
+            for x in rightx:
+                s = s + formula(x, fit)
+                cnt = cnt + 1
+
+            self.avg = s/(cnt*100)
+
+            print(f"curve detected! avg radius = {int(self.avg)}, curve = {1/self.avg}")
+
+def bird(image):
+    blue_image = image[:,:,2]
+    cv2.imwrite("blue.jpeg", blue_image)#Somehow helps....
+
+    source = np.float32([[888, 603], [675.5, 773], [1115, 773], [1013, 603]])
+
+    trans = np.float32([[56, 0], [56, 1984], [344, 1984], [344, 0]])
+
+    ratio = cv2.getPerspectiveTransform(source, trans)
+
+    bird_view = cv2.warpPerspective(blue_image, ratio, (500, 2200))
+    cv2.imwrite("bird_view.jpeg", bird_view)
+    
+    return bird_view[:,:]
+
+def find_road(view):
+    road = np.zeros_like(view)
+    road[(view <= 150) & (view >= 80)] = 1
+    cv2.imwrite("road.jpeg", road)
+
+    hist = np.sum(road[road.shape[0]//2:,:], axis=0)
+    midpoint = hist.shape[0]//2
+
+    rightx = []
+    righty = []
+
+    prev = np.argmax(hist[midpoint:]) + midpoint
+    for i in range(1, 50):
+        his = np.sum(road[road.shape[0]-9*i:road.shape[0]-9*(i-1),:], axis = 0)
+
+        thresh = (prev-20, prev+20)
+        now = np.argmax(his[max(0, thresh[0]):min(thresh[1],road.shape[1])]) + max(0,thresh[0])
+        
+        if now >= road.shape[1]:
+            break
+        elif now <= 0:
+            break
+        elif now != np.argmin(his[max(0, thresh[0]):min(thresh[1],road.shape[1])]) + max(0,thresh[0]):
+            prev = now
+
+        rightx.append(prev)
+        righty.append(road.shape[0]-9*(i-1)-9/2)
+
+    return rightx, righty
+
+def formula(x, fit):
+
+    return ((1 + (2*fit[0]*x + fit[1])**2)**1.5) / np.absolute(2*fit[0])
 
 
 rclpy.init()
