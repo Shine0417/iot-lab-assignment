@@ -9,12 +9,12 @@ def distance(curr_pnt, curr_pos):
     dist = ((curr_pnt.x-curr_pos.x)**2+(curr_pnt.y-curr_pos.y)**2)**0.5
     return dist
 
-def start(goal, start, curr_pos, pre_pos):
+def start(goal, start, curr_pos, pre_pos, thru):
     dist = distance(start, curr_pos)
     print('dist = %f' %dist)
     throttle = 15
     brake = 0
-    if dist < 7:
+    if not thru:
         front_steer = 0
     else:
         dest_vec = np.array([goal.x-curr_pos.x,
@@ -29,6 +29,6 @@ def start(goal, start, curr_pos, pre_pos):
         dest_rot = np.array([ now_vec[0]*dest_vec[0]+now_vec[1]*dest_vec[1],
                              -now_vec[1]*dest_vec[0]+now_vec[0]*dest_vec[1]])
         angle = -dest_rot[1]
-        front_steer = int(100*(angle))
+        front_steer = int(120*(angle))
 
     return throttle, brake, front_steer

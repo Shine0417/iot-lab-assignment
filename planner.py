@@ -7,12 +7,16 @@ from sensor_msgs.msg import CompressedImage
 from nav_msgs.msg import Odometry
 import matplotlib.pyplot as plt
 import cv2
+'''
 import task1
 import task2
+'''
 import task3
 import task4
 import task5
+'''
 import task6
+'''
 
 DIS_THROSHOLD = 3
 
@@ -61,6 +65,7 @@ class Driver(Node):
     avg = 50
     if currentTask:
         currentCheckPoint = taskToCheckPoints[currentTask]
+    thru = False
 
     def __init__(self):
         super().__init__('Driver')
@@ -79,7 +84,7 @@ class Driver(Node):
         msg = RawControlCommand()
         msg.throttle = 30
         msg.front_steer = 0
-        if self.position and self.pre_position:
+        if self.position and self.pre_position and len(checkPoints) > self.currentCheckPoint:
             checkPoint = checkPoints[self.currentCheckPoint]
             print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
             if self.currentTask == 0: # Direct by waypoints
@@ -102,21 +107,25 @@ class Driver(Node):
                 print('angle = %f' %(angle))
                 '''
                 msg.front_steer = int(100*(angle))
-            elif self.currentTask == 1: # Traffic Light
-                msg.throttle, msg.brake, msg.front_steer = task1.start()
-            elif self.currentTask == 2: # Road Curve
-                msg.throttle, msg.brake, msg.front_steer = task2.start()
+                '''
+                elif self.currentTask == 1: # Traffic Light
+                    msg.throttle, msg.brake, msg.front_steer = task1.start()
+                elif self.currentTask == 2: # Road Curve
+                    msg.throttle, msg.brake, msg.front_steer = task2.start()
+                '''
             elif self.currentTask == 3: # Narrowing Driving Lanes
                 msg.throttle, msg.brake, msg.front_steer = task3.start(self.avg, checkPoints[taskToCheckPoints[3]], self.position)
             elif self.currentTask == 4: # T-junction
-                msg.throttle, msg.brake, msg.front_steer = task4.start(checkPoints[taskToCheckPoints[4]+1], checkPoints[taskToCheckPoints[4]], self.position, self.pre_position)
+                msg.throttle, msg.brake, msg.front_steer = task4.start(checkPoints[taskToCheckPoints[4]+1], checkPoints[taskToCheckPoints[4]], self.position, self.pre_position, self.thru)
             elif self.currentTask == 5: # Roundabout
-                msg.throttle, msg.brake, msg.front_steer = task5.start()
+                msg.throttle, msg.brake, msg.front_steer = task5.start(self.avg, checkPoints[self.currentCheckPoint], checkPoints[taskToCheckPoints[5]], checkPoints[taskToCheckPoints[5]+1],checkPoints[taskToCheckPoints[5]+2],self.position, self.pre_position)
+            '''
             elif self.currentTask == 6: # Angled Parking Slots
                 msg.throttle, msg.brake, msg.front_steer = task6.start()
+            '''
 
-            # Speed limit to 30 m/s
-            if ((self.velocity.x**2)+(self.velocity.y**2)+(self.velocity.z**2))**0.5 > 30.0/3.6:
+            # Speed limit to 10 m/s
+            if ((self.velocity.x**2)+(self.velocity.y**2)+(self.velocity.z**2))**0.5 > 10.0/3.6:
                 msg.throttle = 0
 
 
@@ -125,7 +134,18 @@ class Driver(Node):
     def bounding_boxes_callback(self, data):
         '''
         print('There are %d bounding boxes.' % len(data.boxes))
+        '''
         for box in data.boxes:
+            if (box.centroid.x**2+box.centroid.y**2)**0.5 < 8 and box.centroid.y > 6:
+                print('central of box is at %f %f %f.' % 
+                        (box.centroid.x, box.centroid.y, box.centroid.z))
+                if box.centroid.x < 0:
+                    self.thru = True
+                    print('thru is True')
+
+
+
+        '''
             print('central of box is at %f %f %f.' % 
                     (box.centroid.x, box.centroid.y, box.centroid.z))
         '''
