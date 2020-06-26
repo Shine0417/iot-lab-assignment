@@ -57,7 +57,7 @@ class Driver(Node):
     position = None
     pre_position = None
     velocity = None
-    currentTask = 3  # You can change the task to test
+    currentTask = 4  # You can change the task to test
     avg = 50
     if currentTask:
         currentCheckPoint = taskToCheckPoints[currentTask]
@@ -109,7 +109,7 @@ class Driver(Node):
             elif self.currentTask == 3: # Narrowing Driving Lanes
                 msg.throttle, msg.brake, msg.front_steer = task3.start(self.avg, checkPoints[taskToCheckPoints[3]], self.position)
             elif self.currentTask == 4: # T-junction
-                msg.throttle, msg.brake, msg.front_steer = task4.start()
+                msg.throttle, msg.brake, msg.front_steer = task4.start(checkPoints[taskToCheckPoints[4]+1], checkPoints[taskToCheckPoints[4]], self.position, self.pre_position)
             elif self.currentTask == 5: # Roundabout
                 msg.throttle, msg.brake, msg.front_steer = task5.start()
             elif self.currentTask == 6: # Angled Parking Slots

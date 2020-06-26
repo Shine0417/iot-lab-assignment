@@ -19,13 +19,13 @@ def start(avg, curr_pnt, curr_pos):
         front_steer = -25
     elif dist < 12:
         front_steer = 25
-    elif dist < 36:
+    elif dist < 30:
         front_steer = 0
         throttle = 0
     else:
         throttle = 0
         if avg <= 25:
-            front_steer = -32
+            front_steer = -30
         elif avg >= 80:
             front_steer = 10
     return throttle, brake, front_steer
