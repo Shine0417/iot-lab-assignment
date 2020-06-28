@@ -53,8 +53,8 @@ with open('waypoints_2.csv') as f:
             taskToCheckPoints[task] = len(checkPoints)
         checkPoints.append(CheckPoint(x, y, task))
         line = f.readline()
-for checkPoint in checkPoints:
-    print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
+# for checkPoint in checkPoints:
+#     print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
 
 class Driver(Node):
     currentCheckPoint = 0
@@ -63,6 +63,8 @@ class Driver(Node):
     velocity = None
     currentTask = 4  # You can change the task to test
     avg = 50
+    rightx = []
+    righty = []
     if currentTask:
         currentCheckPoint = taskToCheckPoints[currentTask]
     thru = False
@@ -86,7 +88,7 @@ class Driver(Node):
         msg.front_steer = 0
         if self.position and self.pre_position and len(checkPoints) > self.currentCheckPoint:
             checkPoint = checkPoints[self.currentCheckPoint]
-            print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
+            #print('x = %d, y = %d, task = %d' %(checkPoint.x, checkPoint.y, checkPoint.task))
             if self.currentTask == 0: # Direct by waypoints
                 dest_vec = np.array([checkPoints[self.currentCheckPoint].x-self.position.x,
                                      checkPoints[self.currentCheckPoint].y-self.position.y])
@@ -114,9 +116,9 @@ class Driver(Node):
                     msg.throttle, msg.brake, msg.front_steer = task2.start()
                 '''
             elif self.currentTask == 3: # Narrowing Driving Lanes
-                msg.throttle, msg.brake, msg.front_steer = task3.start(self.avg, checkPoints[taskToCheckPoints[3]], self.position)
+                msg.throttle, msg.brake, msg.front_steer = task3.start(self.avg, checkPoints[taskToCheckPoints[3]], self.position, self.rightx, self.righty)
             elif self.currentTask == 4: # T-junction
-                msg.throttle, msg.brake, msg.front_steer = task4.start(checkPoints[taskToCheckPoints[4]+1], checkPoints[taskToCheckPoints[4]], self.position, self.pre_position, self.thru)
+                msg.throttle, msg.brake, msg.front_steer = task4.start(checkPoints[taskToCheckPoints[4]+1], checkPoints[taskToCheckPoints[4]], self.position, self.pre_position, self.thru, self.rightx)
             elif self.currentTask == 5: # Roundabout
                 msg.throttle, msg.brake, msg.front_steer = task5.start(self.avg, checkPoints[self.currentCheckPoint], checkPoints[taskToCheckPoints[5]], checkPoints[taskToCheckPoints[5]+1],checkPoints[taskToCheckPoints[5]+2],self.position, self.pre_position)
             '''
@@ -136,7 +138,7 @@ class Driver(Node):
         print('There are %d bounding boxes.' % len(data.boxes))
         '''
         for box in data.boxes:
-            if (box.centroid.x**2+box.centroid.y**2)**0.5 < 8 and box.centroid.y > 6:
+            if (box.centroid.x**2+box.centroid.y**2)**0.5 < 7.96 and box.centroid.y > 5.96:
                 print('central of box is at %f %f %f.' % 
                         (box.centroid.x, box.centroid.y, box.centroid.z))
                 if box.centroid.x < 0:
@@ -174,14 +176,14 @@ class Driver(Node):
     def camera_callback(self, data):
         RGB_image = cv2.cvtColor(cv2.imdecode(np.array(data.data, dtype=np.uint8), cv2.IMREAD_COLOR) , cv2.COLOR_BGR2RGB)
         view = bird(RGB_image)
-        rightx, righty = find_road(view)
+        self.rightx, self.righty = find_road(view)
 
-        if (max(rightx)-min(rightx)) >= 50:
+        if (max(self.rightx)-min(self.rightx)) >= 50:
             s = 0
             cnt = 0
-            fit = np.polyfit(rightx, righty, 2)
+            fit = np.polyfit(self.rightx, self.righty, 2)
 
-            for x in rightx:
+            for x in self.rightx:
                 s = s + formula(x, fit)
                 cnt = cnt + 1
 
@@ -191,7 +193,7 @@ class Driver(Node):
 
 def bird(image):
     blue_image = image[:,:,2]
-    cv2.imwrite("blue.jpeg", blue_image)#Somehow helps....
+    #cv2.imwrite("blue.jpeg", blue_image)#Somehow helps....
 
     source = np.float32([[888, 603], [675.5, 773], [1115, 773], [1013, 603]])
 
@@ -200,14 +202,14 @@ def bird(image):
     ratio = cv2.getPerspectiveTransform(source, trans)
 
     bird_view = cv2.warpPerspective(blue_image, ratio, (500, 2200))
-    cv2.imwrite("bird_view.jpeg", bird_view)
+    #cv2.imwrite("bird_view.jpeg", bird_view)
     
     return bird_view[:,:]
 
 def find_road(view):
     road = np.zeros_like(view)
     road[(view <= 150) & (view >= 80)] = 1
-    cv2.imwrite("road.jpeg", road)
+    #cv2.imwrite("road.jpeg", road)
 
     hist = np.sum(road[road.shape[0]//2:,:], axis=0)
     midpoint = hist.shape[0]//2
