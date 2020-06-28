@@ -35,6 +35,8 @@ class Driver(Node):
 
         self.left_line = None
 
+        self.distance = 250
+
     def controller_callback(self):
         msg = RawControlCommand()
         msg.throttle = int(self.throttle)
@@ -54,19 +56,25 @@ class Driver(Node):
         # plt.imshow(BCB4)
         # plt.show()
 
-        right_line = self.draw_line(40 , 15 , 20 , BCB , 1)
-        left_line = self.draw_line(80 , 15 , 60 , BCB4 , 0)
+        right_line = self.draw_line(40 , 15 , 40 , BCB , 1)
+        left_line = self.draw_line(80 , 40 , 60 , BCB4 , 0)
 
-        right_x , right_y = self.line_to_go(100 , right_line , 1)
-        left_x , left_y = self.line_to_go(230 , left_line , 0)
+        if self.steer <= -20:
+            self.distance = 500
+        elif self.steer <= -10:
+            self.distance = 275
+        else:
+            self.distance = 250
+        right_x , right_y = self.line_to_go(400 , right_line , 1)
+        left_x , left_y = self.line_to_go(self.distance , left_line , 0)
 
         weight_R = np.zeros_like(right_x)
         weight_R[:weight_R.shape[0]//6] = 20
         weight_R[weight_R.shape[0]//6:] = 1
         #print(weight_Rx)
         weight_L = np.zeros_like(left_x)
-        weight_L[:min(3, weight_L.shape[0]//10 + 1)] = 40
-        weight_L[min(3, weight_L.shape[0]//10 + 1):] = 1
+        weight_L[:min(15, weight_L.shape[0]//4 + 1)] = 10
+        weight_L[min(15, weight_L.shape[0]//4 + 1):] = 1
         #print(weight_L)
         #print(left_x)
 
@@ -78,12 +86,15 @@ class Driver(Node):
             print("determine by right line")
             x = np.average(right_x, weights = weight_R)
             y = np.average(right_y, weights = weight_R)
-        elif len(right_x) == 0:
+        else:
             x = np.average(left_x, weights = weight_L)
             y = np.average(left_y, weights = weight_L)
-        else:
-            x = (np.average(left_x, weights = weight_L) * 20 + np.average(right_x, weights = weight_R)) / 21
-            y = (np.average(left_y, weights = weight_L) * 20 + np.average(right_y, weights = weight_R)) / 21
+        # elif len(right_x) == 0:
+        #     x = np.average(left_x, weights = weight_L)
+        #     y = np.average(left_y, weights = weight_L)
+        # else:
+        #     x = (np.average(left_x, weights = weight_L) * 30 + np.average(right_x, weights = weight_R)) / 31
+        #     y = (np.average(left_y, weights = weight_L) * 30 + np.average(right_y, weights = weight_R)) / 31
 
         # print("x=", x)
         # print("y=", y)
@@ -113,7 +124,7 @@ class Driver(Node):
         length_d = np.sqrt(direction.dot(direction))
         length_t = np.sqrt(target.dot(target))
         theta = np.arcsin(np.cross(direction, target)/(length_t * length_d)) 
-        self.steer = int(theta * 100 / np.pi)
+        self.steer = int(theta * 200 / np.pi)
         self.throttle = 3
         # self.throttle = 8
         # if(abs(self.steer) >= 15):
@@ -140,7 +151,9 @@ class Driver(Node):
         # plt.imshow(image)
         # plt.show()
         # convert the image to aerial view according to specific tested points
-        src = np.float32([[888, 603.3], [675.5, 773.3], [1115, 773.3], [1013, 603.3]])
+        #src = np.float32([[888, 603.3], [675.5, 773.3], [1115, 773.3], [1013, 603.3]])
+        #src = np.float32([[888, 603.3], [755.5, 833.3], [1035, 833.3], [1013, 603.3]])
+        src = np.float32([[864, 603.3], [635.5, 833.3], [905, 833.3], [989, 603.3]])
         # dst = np.float32([[56, 0], [56, 1984], [344, 1984], [344, 0]])
         dst = np.float32([[850, 0], [850, 5000], [1150, 5000], [1150, 0]])
         M = cv2.getPerspectiveTransform(src, dst)
